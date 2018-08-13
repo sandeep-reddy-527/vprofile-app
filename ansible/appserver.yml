@@ -1,0 +1,62 @@
+---
+- hosts: appservers
+  become: true
+  gather_facts: False
+
+  tasks: 
+  - name: installing tomcat
+    package:
+      name: "{{ item }}"
+      state: latest
+      update_cache: yes
+      cache_valid_time: 86400
+    with_items:
+      - tomcat8
+      - tomcat8-admin
+      - tomcat8-docs
+      - tomcat8-common
+    tags: 
+     - package
+
+
+  - name: starting tomcat8 service
+    service:
+      name: tomcat8
+      state: started
+      enabled: yes
+
+#  - name: Deploy web application war file
+#    copy:
+#      src: files/vprofile-v1.war
+#      dest: /var/lib/tomcat8/webapps
+#    tags: 
+#     - deploy
+#    notify:
+#      Restart tomcat8
+
+  - name: Download latest VProfile.war file
+    get_url: 
+      url: "http://{{nexusip}}:8081/nexus/content/repositories/{{repo_name}}/{{groupid}}/{{time}}/{{build}}/{{vprofile_version}}"
+      dest: /var/lib/tomcat/webapps/ROOT.war
+      mode: 755
+    notify:
+      - Restart tomcat8
+    tags: 
+     - deploy
+    
+  - name: Deploy web configuration file
+    template:
+      src: templates/application.j2
+      dest: /var/lib/tomcat8/webapps/ROOT/WEB-INF/classes/application.properties
+      force: yes
+    tags: 
+     - deploy
+    notify:
+      Restart tomcat8
+  
+  handlers:
+  - name: Restart tomcat8
+    service: 
+      name: tomcat8
+      state: restarted
+
